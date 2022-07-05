@@ -1,13 +1,13 @@
 #!/bin/bash
 #
 # Author :
-# Date : 220607
-# Version : 0.8.0.3
+# Date : 220705
+# Version : 0.8.0.4
 #
 #
 # User Variables :
 
-rploaderver="0.8.0.3"
+rploaderver="0.8.0.4"
 build="main"
 rploaderfile="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/rploader.sh"
 rploaderrepo="https://github.com/pocopico/tinycore-redpill/raw/$build/"
@@ -54,6 +54,7 @@ function history() {
     0.8.0.1 Updated postupdate to facilitate update to update2
     0.8.0.2 Updated satamap to support DUMMY PORT detection 
     0.8.0.3 Updated satamap to avoid the use of 0 in first controller that cause KP
+    0.8.0.4 Fixed missing binary
     --------------------------------------------------------------------------------------
 EOF
 
@@ -2227,6 +2228,17 @@ function getvars() {
     REDPILL_LKM_MAKE_TARGET="$(echo $platform_selected | jq -r -e '.redpill_lkm_make_target')"
     tcrppart="$(mount | grep -i optional | grep cde | awk -F / '{print $3}' | uniq | cut -c 1-3)3"
     local_cache="/mnt/${tcrppart}/auxfiles"
+
+    if [ ! -n "$(which bspatch)" ]; then
+
+        echo "bspatch does not exist, bringing over from repo"
+
+        curl --location "https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/bspatch" -O
+
+        chmod 777 bspatch
+        sudo mv bspatch /usr/local/bin/
+
+    fi
 
     [ ! -d ${local_cache} ] && sudo mkdir -p ${local_cache}
     [ -h /home/tc/custom-module ] && unlink /home/tc/custom-module
