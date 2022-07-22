@@ -2,12 +2,12 @@
 #
 # Author :
 # Date : 220705
-# Version : 0.8.0.4
+# Version : 0.8.0.5
 #
 #
 # User Variables :
 
-rploaderver="0.8.0.4"
+rploaderver="0.8.0.5"
 build="main"
 rploaderfile="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/rploader.sh"
 rploaderrepo="https://github.com/pocopico/tinycore-redpill/raw/$build/"
@@ -55,6 +55,7 @@ function history() {
     0.8.0.2 Updated satamap to support DUMMY PORT detection 
     0.8.0.3 Updated satamap to avoid the use of 0 in first controller that cause KP
     0.8.0.4 Fixed missing binary
+    0.8.0.5 Fixed a jq issue in listextension
     --------------------------------------------------------------------------------------
 EOF
 
@@ -2447,7 +2448,7 @@ function listextension() {
 
     if [ ! -z $1 ]; then
         echo "Searching for matching extension for $1"
-        matchingextension=($(jq ". | select(.id | contains(\"${1}\")) .url  " rpext-index.json))
+        matchingextension=($(jq ". | select(.id | endswith(\"${1}\")) .url  " rpext-index.json))
 
         if [ ! -z $matchingextension ]; then
             echo "Found matching extension : "
