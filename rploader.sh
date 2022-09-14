@@ -2,12 +2,12 @@
 #
 # Author :
 # Date : 220914
-# Version : 0.9.1.5
+# Version : 0.9.1.6
 #
 #
 # User Variables :
 
-rploaderver="0.9.1.5"
+rploaderver="0.9.1.6"
 build="develop"
 rploaderfile="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/rploader.sh"
 rploaderrepo="https://github.com/pocopico/tinycore-redpill/raw/$build/"
@@ -70,6 +70,7 @@ function history() {
     0.9.1.3 Fixed bsdiff not found issue
     0.9.1.4 Fixed overlaping downloadextractor processes
     0.9.1.5 Enhanced postupdate process to update user_config.json to new format
+    0.9.1.6 Fixed compressed non-compressed RAMDISK issue 
     --------------------------------------------------------------------------------------
 EOF
 
@@ -660,6 +661,7 @@ function postupdate() {
 
         if [ $(od /mnt/${loaderdisk}1/rd.gz | head -1 | awk '{print $2}') == "000135" ]; then
             sudo unlzma -c /mnt/${loaderdisk}1/rd.gz | cpio -idm
+            RD_COMPRESSED="yes"
         else
             sudo cat /mnt/${loaderdisk}1/rd.gz | cpio -idm
         fi
@@ -671,7 +673,13 @@ function postupdate() {
 
         if [ "$answer" == "y" ] || [ "$answer" == "Y" ]; then
 
-            echo "Recreating ramdisk " && sudo find . 2>/dev/null | cpio -o -H newc -R root:root | xz -9 --format=lzma >../rd.gz
+            echo "Recreating ramdisk "
+
+            if [ "$RD_COMPRESSED" = "yes" ]; then
+                sudo find . 2>/dev/null | sudo cpio -o -H newc -R root:root | xz -9 --format=lzma >../rd.gz
+            else
+                sudo find . 2>/dev/null | sudo cpio -o -H newc -R root:root >../rd.gz
+            fi
 
             cd ..
 
@@ -2023,6 +2031,22 @@ menuentry 'Tiny Core Image Build' {
         linux /vmlinuz64 loglevel=3 cde waitusb=5 vga=791
         echo Loading initramfs...
         initrd /corepure64.gz
+        echo Booting TinyCore for loader creation
+}
+EOF
+
+}
+
+function tcrpentry() {
+
+    cat <<EOF
+menuentry 'Tiny Core Friend' {
+        savedefault
+        set root=(hd0,msdos3)
+        echo Loading Linux...
+        linux /bzImage loglevel=3 cde waitusb=5 vga=791
+        echo Loading initramfs...
+        initrd /initrd
         echo Booting TinyCore for loader creation
 }
 EOF
