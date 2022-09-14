@@ -1,13 +1,13 @@
 #!/bin/bash
 #
 # Author :
-# Date : 220708
-# Version : 0.9.1.4
+# Date : 220914
+# Version : 0.9.1.5
 #
 #
 # User Variables :
 
-rploaderver="0.9.1.4"
+rploaderver="0.9.1.5"
 build="develop"
 rploaderfile="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/rploader.sh"
 rploaderrepo="https://github.com/pocopico/tinycore-redpill/raw/$build/"
@@ -20,6 +20,7 @@ dtcbin="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/tools
 dtsfiles="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build"
 timezone="UTC"
 ntpserver="pool.ntp.org"
+userconfigfile="/home/tc/user_config.json"
 
 fullupdatefiles="custom_config.json custom_config_jun.json global_config.json modules.alias.3.json.gz modules.alias.4.json.gz rpext-index.json user_config.json dtc rploader.sh ds1621p.dts ds920p.dts"
 
@@ -68,6 +69,7 @@ function history() {
     0.9.1.2 Fixed a jq issue in listextension
     0.9.1.3 Fixed bsdiff not found issue
     0.9.1.4 Fixed overlaping downloadextractor processes
+    0.9.1.5 Enhanced postupdate process to update user_config.json to new format
     --------------------------------------------------------------------------------------
 EOF
 
@@ -581,16 +583,61 @@ function installapache() {
 
 }
 
+function updateuserconfig() {
+
+    echo "Checking user config for general block"
+    generalblock="$(jq -r -e '.general' $userconfigfile)"
+    if [ "$generalblock" = "null" ] || [ -n "$generalblock" ]; then
+        echo "Result=${generalblock}, File does not contain general block, adding block"
+
+        for field in model version zimghash rdhash usb_line sata_line; do
+            jsonfile=$(jq ".general+={\"$field\":\"\"}" $userconfigfile)
+            echo $jsonfile | jq . >$userconfigfile
+        done
+    fi
+}
+
+function updateuserconfigfield() {
+
+    field="$1"
+    value="$2"
+
+    if [ -n "$1 " ] && [ -n "$2" ]; then
+        jsonfile=$(jq ".general+={\"$field\":\"$value\"}" $userconfigfile)
+        echo $jsonfile | jq . >$userconfigfile
+    else
+        echo "No values to update specified"
+    fi
+}
+
 function postupdate() {
 
     loaderdisk="$(mount | grep -i optional | grep cde | awk -F / '{print $3}' | uniq | cut -c 1-3)"
 
     cd /home/tc
 
+    updateuserconfig
+    updateuserconfigfield "model" "$MODEL"
+    updateuserconfigfield "version" "${TARGET_VERSION}-${TARGET_REVISION}"
+
     echo "Creating temp ramdisk space" && mkdir /home/tc/ramdisk
 
     echo "Mounting partition ${loaderdisk}1" && sudo mount /dev/${loaderdisk}1
     echo "Mounting partition ${loaderdisk}2" && sudo mount /dev/${loaderdisk}2
+
+    zimghash=$(sha256sum /mnt/${loaderdisk}2/zImage | awk '{print $1}')
+    updateuserconfigfield "zimghash" "$zimghash"
+    rdhash=$(sha256sum /mnt/${loaderdisk}2/rd.gz | awk '{print $1}')
+    updateuserconfigfield "rdhash" "$rdhash"
+
+    usb_line=$(grep USB -A 5 /mnt/${loaderdisk}1/boot/grub/grub.cfg | grep linux | cut -c 16-999)
+    updateuserconfigfield "usb_line" "$usb_line"
+
+    sata_line=$(grep SATA -A 5 /mnt/${loaderdisk}1/boot/grub/grub.cfg | grep linux | cut -c 16-999)
+    updateuserconfigfield "sata_line" "$sata_line"
+
+    echo "Backing up $userconfigfile "
+    cp $userconfigfile /mnt/${loaderdisk}3
 
     cd /home/tc/ramdisk
 
