@@ -2,12 +2,12 @@
 #
 # Author :
 # Date : 220914
-# Version : 0.9.1.6
+# Version : 0.9.1.7
 #
 #
 # User Variables :
 
-rploaderver="0.9.1.6"
+rploaderver="0.9.1.7"
 build="develop"
 rploaderfile="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/rploader.sh"
 rploaderrepo="https://github.com/pocopico/tinycore-redpill/raw/$build/"
@@ -71,6 +71,7 @@ function history() {
     0.9.1.4 Fixed overlaping downloadextractor processes
     0.9.1.5 Enhanced postupdate process to update user_config.json to new format
     0.9.1.6 Fixed compressed non-compressed RAMDISK issue 
+    0.9.1.7 Enhanced build process to update user_config.json during build process 
     --------------------------------------------------------------------------------------
 EOF
 
@@ -600,11 +601,12 @@ function updateuserconfig() {
 
 function updateuserconfigfield() {
 
-    field="$1"
-    value="$2"
+    block="$1"
+    field="$2"
+    value="$3"
 
     if [ -n "$1 " ] && [ -n "$2" ]; then
-        jsonfile=$(jq ".general+={\"$field\":\"$value\"}" $userconfigfile)
+        jsonfile=$(jq ".$block+={\"$field\":\"$value\"}" $userconfigfile)
         echo $jsonfile | jq . >$userconfigfile
     else
         echo "No values to update specified"
@@ -618,8 +620,8 @@ function postupdate() {
     cd /home/tc
 
     updateuserconfig
-    updateuserconfigfield "model" "$MODEL"
-    updateuserconfigfield "version" "${TARGET_VERSION}-${TARGET_REVISION}"
+    updateuserconfigfield "general" "model" "$MODEL"
+    updateuserconfigfield "general" "version" "${TARGET_VERSION}-${TARGET_REVISION}"
 
     echo "Creating temp ramdisk space" && mkdir /home/tc/ramdisk
 
@@ -627,16 +629,14 @@ function postupdate() {
     echo "Mounting partition ${loaderdisk}2" && sudo mount /dev/${loaderdisk}2
 
     zimghash=$(sha256sum /mnt/${loaderdisk}2/zImage | awk '{print $1}')
-    updateuserconfigfield "zimghash" "$zimghash"
+    updateuserconfigfield "general" "zimghash" "$zimghash"
     rdhash=$(sha256sum /mnt/${loaderdisk}2/rd.gz | awk '{print $1}')
-    updateuserconfigfield "rdhash" "$rdhash"
+    updateuserconfigfield "general" "rdhash" "$rdhash"
 
-    usb_line=$(grep USB -A 5 /mnt/${loaderdisk}1/boot/grub/grub.cfg | grep linux | cut -c 16-999)
-    updateuserconfigfield "usb_line" "$usb_line"
-
-    sata_line=$(grep SATA -A 5 /mnt/${loaderdisk}1/boot/grub/grub.cfg | grep linux | cut -c 16-999)
-    updateuserconfigfield "sata_line" "$sata_line"
-
+    zimghash=$(sha256sum /mnt/${loaderdisk}2/zImage | awk '{print $1}')
+    updateuserconfigfield "general" "zimghash" "$zimghash"
+    rdhash=$(sha256sum /mnt/${loaderdisk}2/rd.gz | awk '{print $1}')
+    updateuserconfigfield "general" "rdhash" "$rdhash"
     echo "Backing up $userconfigfile "
     cp $userconfigfile /mnt/${loaderdisk}3
 
@@ -2417,6 +2417,29 @@ function buildloader() {
         echo "Setting default boot entry to SATA"
         sudo sed -i "/set default=\"0\"/cset default=\"1\"" localdiskp1/boot/grub/grub.cfg
     fi
+
+    ### Updating user_config.json
+
+    updateuserconfigfield "general" "model" "$MODEL"
+    updateuserconfigfield "general" "version" "${TARGET_VERSION}-${TARGET_REVISION}"
+    zimghash=$(sha256sum /mnt/${loaderdisk}2/zImage | awk '{print $1}')
+    updateuserconfigfield "general" "zimghash" "$zimghash"
+    rdhash=$(sha256sum /mnt/${loaderdisk}2/rd.gz | awk '{print $1}')
+    updateuserconfigfield "general" "rdhash" "$rdhash"
+    zimghash=$(sha256sum /mnt/${loaderdisk}2/zImage | awk '{print $1}')
+    updateuserconfigfield "general" "zimghash" "$zimghash"
+    rdhash=$(sha256sum /mnt/${loaderdisk}2/rd.gz | awk '{print $1}')
+    updateuserconfigfield "general" "rdhash" "$rdhash"
+
+    USB_LINE="$(grep -A 5 "USB," /mnt/sdc1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
+    SATA_LINE="$(grep -A 5 "SATA," /mnt/sdc1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
+
+    echo "Updated user_config with USB Command Line : $USB_LINE"
+    json=$(jq --arg var "${USB_LINE}" '.general.usb_line = $var' user_config.json) && echo -E "${json}" | jq . >$userconfigfile
+    echo "Updated user_config with SATA Command Line : $SATA_LINE"
+    json=$(jq --arg var "${SATA_LINE}" '.general.sata_line = $var' user_config.json) && echo -E "${json}" | jq . >$userconfigfile
+
+    cp $userconfigfile /mnt/${loaderdisk}3/
 
     sudo umount part1
     sudo umount part2
