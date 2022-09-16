@@ -2416,22 +2416,22 @@ function buildloader() {
 
     updateuserconfigfield "general" "model" "$MODEL"
     updateuserconfigfield "general" "version" "${TARGET_VERSION}-${TARGET_REVISION}"
-    zimghash=$(sha256sum localdiskp2/zImage | awk '{print $1}')
+    zimghash=$(sha256sum /home/tc/redpill-load/localdiskp2/zImage | awk '{print $1}')
     updateuserconfigfield "general" "zimghash" "$zimghash"
-    rdhash=$(sha256sum localdiskp2/rd.gz | awk '{print $1}')
+    rdhash=$(sha256sum /home/tc/redpill-load/localdiskp2/rd.gz | awk '{print $1}')
     updateuserconfigfield "general" "rdhash" "$rdhash"
-    zimghash=$(sha256sum localdiskp2/zImage | awk '{print $1}')
+    zimghash=$(sha256sum /home/tc/redpill-load/localdiskp2/zImage | awk '{print $1}')
     updateuserconfigfield "general" "zimghash" "$zimghash"
-    rdhash=$(sha256sum localdiskp2/rd.gz | awk '{print $1}')
+    rdhash=$(sha256sum /home/tc/redpill-load/localdiskp2/rd.gz | awk '{print $1}')
     updateuserconfigfield "general" "rdhash" "$rdhash"
 
-    USB_LINE="$(grep -A 5 "USB," localdiskp1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
-    SATA_LINE="$(grep -A 5 "SATA," localdiskp1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
+    USB_LINE="$(grep -A 5 "USB," /home/tc/redpill-load/localdiskp1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
+    SATA_LINE="$(grep -A 5 "SATA," /home/tc/redpill-load/localdiskp1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
 
     echo "Updated user_config with USB Command Line : $USB_LINE"
-    json=$(jq --arg var "${USB_LINE}" '.general.usb_line = $var' user_config.json) && echo -E "${json}" | jq . >$userconfigfile
+    json=$(jq --arg var "${USB_LINE}" '.general.usb_line = $var' $userconfigfile) && echo -E "${json}" | jq . >$userconfigfile
     echo "Updated user_config with SATA Command Line : $SATA_LINE"
-    json=$(jq --arg var "${SATA_LINE}" '.general.sata_line = $var' user_config.json) && echo -E "${json}" | jq . >$userconfigfile
+    json=$(jq --arg var "${SATA_LINE}" '.general.sata_line = $var' $userconfigfile) && echo -E "${json}" | jq . >$userconfigfile
 
     cp $userconfigfile /mnt/${loaderdisk}3/
     cp localdiskp1/zImage /mnt/${loaderdisk}3/zImage-dsm
