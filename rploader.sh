@@ -2,12 +2,12 @@
 #
 # Author :
 # Date : 220914
-# Version : 0.9.1.7
+# Version : 0.9.1.8
 #
 #
 # User Variables :
 
-rploaderver="0.9.1.7"
+rploaderver="0.9.1.8"
 build="develop"
 rploaderfile="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/rploader.sh"
 rploaderrepo="https://github.com/pocopico/tinycore-redpill/raw/$build/"
@@ -72,6 +72,7 @@ function history() {
     0.9.1.5 Enhanced postupdate process to update user_config.json to new format
     0.9.1.6 Fixed compressed non-compressed RAMDISK issue 
     0.9.1.7 Enhanced build process to update user_config.json during build process 
+    0.9.1.8 Enhanced build process to create friend files
     --------------------------------------------------------------------------------------
 EOF
 
@@ -1015,8 +1016,8 @@ function fullupgrade() {
 
         echo "Updating ${updatefile}"
 
-        sudo mv $updatefile old/${updatefile}.${backupdate}
-        sudo curl --location "${rploaderrepo}/${updatefile}" -O
+        [ -f ${updatefile} ] && sudo mv $updatefile old/${updatefile}.${backupdate}
+        sudo curl --insecure --silent --location "${rploaderrepo}/${updatefile}" -O
 
     done
 
@@ -2037,7 +2038,7 @@ EOF
 
 }
 
-function tcrpentry() {
+function tcrpfriendentry() {
 
     cat <<EOF
 menuentry 'Tiny Core Friend' {
@@ -2411,28 +2412,21 @@ function buildloader() {
     echo "======================================================================="
     grep menuentry localdiskp1/boot/grub/grub.cfg
 
-    checkmachine
-
-    if [ "$MACHINE" = "VIRTUAL" ]; then
-        echo "Setting default boot entry to SATA"
-        sudo sed -i "/set default=\"0\"/cset default=\"1\"" localdiskp1/boot/grub/grub.cfg
-    fi
-
     ### Updating user_config.json
 
     updateuserconfigfield "general" "model" "$MODEL"
     updateuserconfigfield "general" "version" "${TARGET_VERSION}-${TARGET_REVISION}"
-    zimghash=$(sha256sum /mnt/${loaderdisk}2/zImage | awk '{print $1}')
+    zimghash=$(sha256sum localdiskp2/zImage | awk '{print $1}')
     updateuserconfigfield "general" "zimghash" "$zimghash"
-    rdhash=$(sha256sum /mnt/${loaderdisk}2/rd.gz | awk '{print $1}')
+    rdhash=$(sha256sum localdiskp2/rd.gz | awk '{print $1}')
     updateuserconfigfield "general" "rdhash" "$rdhash"
-    zimghash=$(sha256sum /mnt/${loaderdisk}2/zImage | awk '{print $1}')
+    zimghash=$(sha256sum localdiskp2/zImage | awk '{print $1}')
     updateuserconfigfield "general" "zimghash" "$zimghash"
-    rdhash=$(sha256sum /mnt/${loaderdisk}2/rd.gz | awk '{print $1}')
+    rdhash=$(sha256sum localdiskp2/rd.gz | awk '{print $1}')
     updateuserconfigfield "general" "rdhash" "$rdhash"
 
-    USB_LINE="$(grep -A 5 "USB," /mnt/sdc1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
-    SATA_LINE="$(grep -A 5 "SATA," /mnt/sdc1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
+    USB_LINE="$(grep -A 5 "USB," localdiskp1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
+    SATA_LINE="$(grep -A 5 "SATA," localdiskp1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
 
     echo "Updated user_config with USB Command Line : $USB_LINE"
     json=$(jq --arg var "${USB_LINE}" '.general.usb_line = $var' user_config.json) && echo -E "${json}" | jq . >$userconfigfile
@@ -2440,6 +2434,36 @@ function buildloader() {
     json=$(jq --arg var "${SATA_LINE}" '.general.sata_line = $var' user_config.json) && echo -E "${json}" | jq . >$userconfigfile
 
     cp $userconfigfile /mnt/${loaderdisk}3/
+    cp localdiskp1/zImage /mnt/${loaderdisk}3/zImage-dsm
+
+    # Compining rd.gz and custom.gz
+
+    [ ! -d /home/tc/rd.temp ] && mkdir /home/tc/rd.temp
+    [ -d /home/tc/rd.temp ] && cd /home/tc/rd.temp
+    RD_COMPRESSED=$(cat /home/tc/redpill-load/config/$MODEL/${TARGET_VERSION}-${TARGET_REVISION}/config.json | jq -r -e ' .extra .compress_rd')
+
+    if [ "$RD_COMPRESSED" = "false" ]; then
+        echo "Ramdisk in not compressed "
+        cat /home/tc/redpill-load/localdiskp1/rd.gz | cpio -idm
+        cat /home/tc/redpill-load/localdiskp1/custom.gz | cpio -idm
+        (cd /home/tc/rd.temp && find . | sudo cpio -o -H newc -R root:root >/mnt/${loaderdisk}3/initrd-dsm) >/dev/null
+    else
+        unlzma -dc /home/tc/redpill-load/localdiskp1/rd.gz | cpio -idm
+        cat /home/tc/redpill-load/localdiskp1/custom.gz | cpio -idm
+        (cd /home/tc/rd.temp && find . | sudo cpio -o -H newc -R root:root | xz -9 --format=lzma >/mnt/${loaderdisk}3/initrd-dsm) >/dev/null
+    fi
+
+    sudo rm -rf /home/tc/rd.temp
+
+    cd /home/tc/redpill-load/
+    ####
+
+    checkmachine
+
+    if [ "$MACHINE" = "VIRTUAL" ]; then
+        echo "Setting default boot entry to SATA"
+        sudo sed -i "/set default=\"0\"/cset default=\"1\"" localdiskp1/boot/grub/grub.cfg
+    fi
 
     sudo umount part1
     sudo umount part2
