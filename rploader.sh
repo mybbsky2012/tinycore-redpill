@@ -2,12 +2,12 @@
 #
 # Author :
 # Date : 220914
-# Version : 0.9.1.8
+# Version : 0.9.1.9
 #
 #
 # User Variables :
 
-rploaderver="0.9.1.8"
+rploaderver="0.9.1.9"
 build="develop"
 rploaderfile="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/rploader.sh"
 rploaderrepo="https://github.com/pocopico/tinycore-redpill/raw/$build/"
@@ -73,6 +73,7 @@ function history() {
     0.9.1.6 Fixed compressed non-compressed RAMDISK issue 
     0.9.1.7 Enhanced build process to update user_config.json during build process 
     0.9.1.8 Enhanced build process to create friend files
+    0.9.1.9 Further enhanced build process 
     --------------------------------------------------------------------------------------
 EOF
 
@@ -2381,6 +2382,11 @@ function buildloader() {
 
     loaderdisk=$(mount | grep -i optional | grep cde | awk -F / '{print $3}' | uniq | cut -c 1-3)
 
+    # Unmount to make sure you are able to mount properly
+
+    umount /dev/${loaderdisk}1
+    umount /dev/${loaderdisk}2
+
     if [ -d localdiskp1 ]; then
         sudo mount /dev/${loaderdisk}1 localdiskp1
         echo "Mounting /dev/${loaderdisk}1 to localdiskp1 "
@@ -2404,6 +2410,8 @@ function buildloader() {
         sudo cp -rf part2/* localdiskp2/
         echo "Creating tinycore entry"
         tinyentry | sudo tee --append localdiskp1/boot/grub/grub.cfg
+        tcrpfriendentry | sudo tee --append localdiskp1/boot/grub/grub.cfg
+
     else
         echo "ERROR: Failed to mount correctly all required partitions"
     fi
@@ -2470,6 +2478,8 @@ function buildloader() {
     sudo umount localdiskp1
     sudo umount localdiskp2
     sudo losetup -D
+
+    sudo rm -f /home/tc/redpill_load/loader.img
 
     echo "Caching files for future use"
     [ ! -d ${local_cache} ] && mkdir ${local_cache}
