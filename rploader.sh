@@ -2410,7 +2410,7 @@ function buildloader() {
         sudo cp -rf part2/* localdiskp2/
         echo "Creating tinycore entry"
         tinyentry | sudo tee --append localdiskp1/boot/grub/grub.cfg
-        tcrpfriendentry | sudo tee --append localdiskp1/boot/grub/grub.cfg
+        #tcrpfriendentry | sudo tee --append localdiskp1/boot/grub/grub.cfg
 
     else
         echo "ERROR: Failed to mount correctly all required partitions"
