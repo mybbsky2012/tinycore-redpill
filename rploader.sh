@@ -2,12 +2,12 @@
 #
 # Author :
 # Date : 220914
-# Version : 0.9.1.9
+# Version : 0.9.2.0
 #
 #
 # User Variables :
 
-rploaderver="0.9.1.9"
+rploaderver="0.9.2.0"
 build="develop"
 rploaderfile="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/rploader.sh"
 rploaderrepo="https://github.com/pocopico/tinycore-redpill/raw/$build/"
@@ -74,6 +74,7 @@ function history() {
     0.9.1.7 Enhanced build process to update user_config.json during build process 
     0.9.1.8 Enhanced build process to create friend files
     0.9.1.9 Further enhanced build process 
+    0.9.2.0 Introducing TCRP Friend
     --------------------------------------------------------------------------------------
 EOF
 
@@ -2046,10 +2047,10 @@ menuentry 'Tiny Core Friend' {
         savedefault
         set root=(hd0,msdos3)
         echo Loading Linux...
-        linux /bzImage loglevel=3 cde waitusb=5 vga=791
+        linux /bzImage-friend loglevel=3 cde waitusb=5 vga=791
         echo Loading initramfs...
-        initrd /initrd
-        echo Booting TinyCore for loader creation
+        initrd /initrd-friend
+        echo Booting TinyCore Friend
 }
 EOF
 
@@ -2093,7 +2094,9 @@ mountshare, version, monitor, help
   Build the 💊 RedPill LKM and update the loader image for the specified platform version and update
   current loader.
 
-  Valid Options:     static/compile/manual 
+  Valid Options:     static/compile/manual/junmod/withfriend
+
+  ** withfriend add the TCRP friend and a boot option for auto patching 
   
 - ext <platform> <option> <URL> 
   Manage extensions using redpill extension manager. 
@@ -2337,12 +2340,12 @@ function buildloader() {
     else
 
         if [ -d /home/tc/custom-module ]; then
-            echo "Want to use firmware files from /home/tc/custom-module/*.pat ? [yY/nN] : "
-            read answer
+            #echo "Want to use firmware files from /home/tc/custom-module/*.pat ? [yY/nN] : "
+            #read answer
 
-            if [ "$answer" == "y" ] || [ "$answer" == "Y" ]; then
-                sudo cp -adp /home/tc/custom-module/*${TARGET_REVISION}*.pat /home/tc/redpill-load/cache/
-            fi
+            #if [ "$answer" == "y" ] || [ "$answer" == "Y" ]; then
+            sudo cp -adp /home/tc/custom-module/*${TARGET_REVISION}*.pat /home/tc/redpill-load/cache/
+            #fi
         fi
 
     fi
@@ -2384,8 +2387,8 @@ function buildloader() {
 
     # Unmount to make sure you are able to mount properly
 
-    umount /dev/${loaderdisk}1
-    umount /dev/${loaderdisk}2
+    sudo umount /dev/${loaderdisk}1
+    sudo umount /dev/${loaderdisk}2
 
     if [ -d localdiskp1 ]; then
         sudo mount /dev/${loaderdisk}1 localdiskp1
@@ -2410,7 +2413,19 @@ function buildloader() {
         sudo cp -rf part2/* localdiskp2/
         echo "Creating tinycore entry"
         tinyentry | sudo tee --append localdiskp1/boot/grub/grub.cfg
-        #tcrpfriendentry | sudo tee --append localdiskp1/boot/grub/grub.cfg
+
+        if [ "$WITHFRIEND" = "YES" ]; then
+
+            [ ! -f /home/tc/friend/initrd-friend ] && [ ! -f /home/tc/friend/bzImage-friend ] && bringoverfriend
+
+            if [ -f /home/tc/friend/initrd-friend ] && [ -f /home/tc/friend/bzImage-friend ]; then
+
+                cp /home/tc/friend/initrd-friend /mnt/${loaderdisk}3/
+                cp /home/tc/friend/bzImage-friend /mnt/${loaderdisk}3/
+
+                tcrpfriendentry | sudo tee --append /home/tc/redpill-load/localdiskp1/boot/grub/grub.cfg
+            fi
+        fi
 
     else
         echo "ERROR: Failed to mount correctly all required partitions"
@@ -2442,28 +2457,32 @@ function buildloader() {
     json=$(jq --arg var "${SATA_LINE}" '.general.sata_line = $var' $userconfigfile) && echo -E "${json}" | jq . >$userconfigfile
 
     cp $userconfigfile /mnt/${loaderdisk}3/
-    cp localdiskp1/zImage /mnt/${loaderdisk}3/zImage-dsm
 
-    # Compining rd.gz and custom.gz
+    if [ "$WITHFRIEND" = "YES" ]; then
 
-    [ ! -d /home/tc/rd.temp ] && mkdir /home/tc/rd.temp
-    [ -d /home/tc/rd.temp ] && cd /home/tc/rd.temp
-    RD_COMPRESSED=$(cat /home/tc/redpill-load/config/$MODEL/${TARGET_VERSION}-${TARGET_REVISION}/config.json | jq -r -e ' .extra .compress_rd')
+        cp localdiskp1/zImage /mnt/${loaderdisk}3/zImage-dsm
 
-    if [ "$RD_COMPRESSED" = "false" ]; then
-        echo "Ramdisk in not compressed "
-        cat /home/tc/redpill-load/localdiskp1/rd.gz | cpio -idm
-        cat /home/tc/redpill-load/localdiskp1/custom.gz | cpio -idm
-        (cd /home/tc/rd.temp && find . | sudo cpio -o -H newc -R root:root >/mnt/${loaderdisk}3/initrd-dsm) >/dev/null
-    else
-        unlzma -dc /home/tc/redpill-load/localdiskp1/rd.gz | cpio -idm
-        cat /home/tc/redpill-load/localdiskp1/custom.gz | cpio -idm
-        (cd /home/tc/rd.temp && find . | sudo cpio -o -H newc -R root:root | xz -9 --format=lzma >/mnt/${loaderdisk}3/initrd-dsm) >/dev/null
+        # Compining rd.gz and custom.gz
+
+        [ ! -d /home/tc/rd.temp ] && mkdir /home/tc/rd.temp
+        [ -d /home/tc/rd.temp ] && cd /home/tc/rd.temp
+        RD_COMPRESSED=$(cat /home/tc/redpill-load/config/$MODEL/${TARGET_VERSION}-${TARGET_REVISION}/config.json | jq -r -e ' .extra .compress_rd')
+
+        if [ "$RD_COMPRESSED" = "false" ]; then
+            echo "Ramdisk in not compressed "
+            cat /home/tc/redpill-load/localdiskp1/rd.gz | sudo cpio -idm
+            cat /home/tc/redpill-load/localdiskp1/custom.gz | sudo cpio -idm
+            sudo chmod +x /home/tc/rd.temp/usr/sbin/modprobe
+            (cd /home/tc/rd.temp && sudo find . | sudo cpio -o -H newc -R root:root >/mnt/${loaderdisk}3/initrd-dsm) >/dev/null
+        else
+            unlzma -dc /home/tc/redpill-load/localdiskp1/rd.gz | sudo cpio -idm
+            cat /home/tc/redpill-load/localdiskp1/custom.gz | sudo cpio -idm
+            sudo chmod +x /home/tc/rd.temp/usr/sbin/modprobe
+            (cd /home/tc/rd.temp && sudo find . | sudo cpio -o -H newc -R root:root | xz -9 --format=lzma >/mnt/${loaderdisk}3/initrd-dsm) >/dev/null
+        fi
     fi
-
-    sudo rm -rf /home/tc/rd.temp
-
     cd /home/tc/redpill-load/
+
     ####
 
     checkmachine
@@ -2479,7 +2498,8 @@ function buildloader() {
     sudo umount localdiskp2
     sudo losetup -D
 
-    sudo rm -f /home/tc/redpill_load/loader.img
+    echo "Cleaning up files"
+    sudo rm -rf /home/tc/rd.temp /home/tc/friend /home/tc/redpill-load/loader.img
 
     echo "Caching files for future use"
     [ ! -d ${local_cache} ] && mkdir ${local_cache}
@@ -2487,14 +2507,11 @@ function buildloader() {
     if [ $(df -h /mnt/${tcrppart} | grep mnt | awk '{print $4}' | cut -c 1-3 | sed -e 's/M//g') -le 400 ]; then
         echo "No adequate space on TCRP loader partition /mnt/${tcrppart} to cache pat file"
         echo "Found $(ls /mnt/${tcrppart}/auxfiles/*pat) file"
-        echo -n "Do you want me to remove older cached pat files and cache current ? [yY/nN] : "
-        read answer
-        if [ "$answer" == "y" ] || [ "$answer" == "Y" ]; then
-            rm -f /mnt/${tcrppart}/auxfiles/*.pat
-            patfile=$(ls /home/tc/redpill-load/cache/*${TARGET_REVISION}*.pat | head -1)
-            echo "Found ${patfile}, copying to cache directory : ${local_cache} "
-            cp -f ${patfile} ${local_cache}
-        fi
+        echo "Removing older cached pat files to cache current"
+        rm -f /mnt/${tcrppart}/auxfiles/*.pat
+        patfile=$(ls /home/tc/redpill-load/cache/*${TARGET_REVISION}*.pat | head -1)
+        echo "Found ${patfile}, copying to cache directory : ${local_cache} "
+        cp -f ${patfile} ${local_cache} && rm /home/tc/redpill-load/cache/*.pat
     else
         if [ -f "$(ls /home/tc/redpill-load/cache/*${TARGET_REVISION}*.pat | head -1)" ]; then
             patfile=$(ls /home/tc/redpill-load/cache/*${TARGET_REVISION}*.pat | head -1)
@@ -2502,6 +2519,18 @@ function buildloader() {
             cp -f ${patfile} ${local_cache}
         fi
     fi
+
+}
+
+function bringoverfriend() {
+
+    echo "Bringing over my friend"
+    [ ! -d /home/tc/friend ] && mkdir /home/tc/friend/ && cd /home/tc/friend
+
+    URLS=$(curl --insecure -s https://api.github.com/repos/pocopico/tcrpfriend/releases/latest | jq -r ".assets[] | select(.name | contains(\"${initrd-friend}\")) | .browser_download_url")
+    for file in $URLS; do curl --insecure --location --progress-bar "$file" -O; done
+
+    cd /home/tc/redpill-load
 
 }
 
@@ -2881,6 +2910,8 @@ if [ -z "$GATEWAY_INTERFACE" ]; then
         checkinternet
         getlatestrploader
         gitdownload
+
+        [ "$3" = "withfriend" ] && echo "withfriend option set, My friend will be added" && WITHFRIEND="YES"
 
         case $3 in
 
