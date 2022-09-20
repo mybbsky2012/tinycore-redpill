@@ -2,12 +2,12 @@
 #
 # Author :
 # Date : 220914
-# Version : 0.9.2.0
+# Version : 0.9.2.1
 #
 #
 # User Variables :
 
-rploaderver="0.9.2.0"
+rploaderver="0.9.2.1"
 build="develop"
 rploaderfile="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/rploader.sh"
 rploaderrepo="https://github.com/pocopico/tinycore-redpill/raw/$build/"
@@ -75,6 +75,7 @@ function history() {
     0.9.1.8 Enhanced build process to create friend files
     0.9.1.9 Further enhanced build process 
     0.9.2.0 Introducing TCRP Friend
+    0.9.2.1 If TCRP Friend is used then default option will be TCRP Friend
     --------------------------------------------------------------------------------------
 EOF
 
@@ -2480,6 +2481,9 @@ function buildloader() {
             sudo chmod +x /home/tc/rd.temp/usr/sbin/modprobe
             (cd /home/tc/rd.temp && sudo find . | sudo cpio -o -H newc -R root:root | xz -9 --format=lzma >/mnt/${loaderdisk}3/initrd-dsm) >/dev/null
         fi
+
+        echo "Setting default boot entry to TCRO Friend"
+        sudo sed -i "/set default=\"0\"/cset default=\"4\"" localdiskp1/boot/grub/grub.cfg
     fi
     cd /home/tc/redpill-load/
 
@@ -2527,8 +2531,17 @@ function bringoverfriend() {
     echo "Bringing over my friend"
     [ ! -d /home/tc/friend ] && mkdir /home/tc/friend/ && cd /home/tc/friend
 
-    URLS=$(curl --insecure -s https://api.github.com/repos/pocopico/tcrpfriend/releases/latest | jq -r ".assets[] | select(.name | contains(\"${initrd-friend}\")) | .browser_download_url")
+    #URLS=$(curl --insecure -s https://api.github.com/repos/pocopico/tcrpfriend/releases/latest | jq -r ".assets[] | select(.name | contains(\"${initrd-friend}\")) | .browser_download_url")
+    URLS=$(curl --insecure -s https://api.github.com/repos/pocopico/tcrpfriend/releases/latest | jq -r ".assets[].browser_download_url")
     for file in $URLS; do curl --insecure --location --progress-bar "$file" -O; done
+
+    if [ -f bzImage-friend ] && [ -f initrd-friend ] && [ -f chksum ]; then
+        FRIENDVERSION="$(grep VERSION chksum | awk -F= '{print $2}')"
+        BZIMAGESHA256="$(grep bzImage-friend chksum | awk '{print $1}')"
+        INITRDSHA256="$(grep initrd-friend chksum | awk '{print $1}')"
+        [ "$(sha256sum bzImage-friend | awk '{print $1}')" == "$BZIMAGESHA256" ] && echo "bzImage-friend checksum OK !" || echo "bzImage-friend checksum ERROR !" || exit 99
+        [ "$(sha256sum initrd-friend | awk '{print $1}')" == "$INITRDSHA256" ] && echo "initrd-friend checksum OK !" || echo "initrd-friend checksum ERROR !" || exit 99
+    fi
 
     cd /home/tc/redpill-load
 
