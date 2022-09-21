@@ -2482,7 +2482,7 @@ function buildloader() {
             (cd /home/tc/rd.temp && sudo find . | sudo cpio -o -H newc -R root:root | xz -9 --format=lzma >/mnt/${loaderdisk}3/initrd-dsm) >/dev/null
         fi
 
-        echo "Setting default boot entry to TCRO Friend"
+        echo "Setting default boot entry to TCRP Friend"
         cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"0\"/cset default=\"3\"" localdiskp1/boot/grub/grub.cfg
 
     else
@@ -2545,6 +2545,8 @@ function bringoverfriend() {
         INITRDSHA256="$(grep initrd-friend chksum | awk '{print $1}')"
         [ "$(sha256sum bzImage-friend | awk '{print $1}')" == "$BZIMAGESHA256" ] && echo "bzImage-friend checksum OK !" || echo "bzImage-friend checksum ERROR !" || exit 99
         [ "$(sha256sum initrd-friend | awk '{print $1}')" == "$INITRDSHA256" ] && echo "initrd-friend checksum OK !" || echo "initrd-friend checksum ERROR !" || exit 99
+    else
+        echo "Could not find friend files, exiting" && exit 0
     fi
 
     cd /home/tc/redpill-load
