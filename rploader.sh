@@ -2483,18 +2483,22 @@ function buildloader() {
         fi
 
         echo "Setting default boot entry to TCRO Friend"
-        sudo sed -i "/set default=\"0\"/cset default=\"4\"" localdiskp1/boot/grub/grub.cfg
+        cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"0\"/cset default=\"4\"" localdiskp1/boot/grub/grub.cfg
+
+    else
+
+        if [ "$MACHINE" = "VIRTUAL" ]; then
+            echo "Setting default boot entry to SATA"
+            cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"0\"/cset default=\"1\"" localdiskp1/boot/grub/grub.cfg
+        fi
+
     fi
+
     cd /home/tc/redpill-load/
 
     ####
 
     checkmachine
-
-    if [ "$MACHINE" = "VIRTUAL" ]; then
-        echo "Setting default boot entry to SATA"
-        sudo sed -i "/set default=\"0\"/cset default=\"1\"" localdiskp1/boot/grub/grub.cfg
-    fi
 
     sudo umount part1
     sudo umount part2
