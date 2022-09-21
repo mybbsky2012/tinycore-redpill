@@ -2483,7 +2483,7 @@ function buildloader() {
         fi
 
         echo "Setting default boot entry to TCRO Friend"
-        cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"0\"/cset default=\"4\"" localdiskp1/boot/grub/grub.cfg
+        cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"0\"/cset default=\"3\"" localdiskp1/boot/grub/grub.cfg
 
     else
 
