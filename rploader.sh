@@ -2,12 +2,12 @@
 #
 # Author :
 # Date : 220914
-# Version : 0.9.2.1
+# Version : 0.9.2.2
 #
 #
 # User Variables :
 
-rploaderver="0.9.2.1"
+rploaderver="0.9.2.2"
 build="develop"
 rploaderfile="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/rploader.sh"
 rploaderrepo="https://github.com/pocopico/tinycore-redpill/raw/$build/"
@@ -76,6 +76,7 @@ function history() {
     0.9.1.9 Further enhanced build process 
     0.9.2.0 Introducing TCRP Friend
     0.9.2.1 If TCRP Friend is used then default option will be TCRP Friend
+    0.9.2.2 Upgrade your system by adding TCRP Friend with command bringfriend
     --------------------------------------------------------------------------------------
 EOF
 
@@ -615,6 +616,170 @@ function updateuserconfigfield() {
     else
         echo "No values to update specified"
     fi
+}
+
+removefriend() {
+
+    clear
+    loaderdisk="$(mount | grep -i optional | grep cde | awk -F / '{print $3}' | uniq | cut -c 1-3)"
+
+    echo "------------------------------------------------------------------------------------------------------------"
+    echo "You are not satisfied with TCRP friend."
+    echo "Understandable, but you will not be able to perform automatic patching after updates."
+    echo "you can still though use the postupdate process instead or just set the default option to SATA or USB as usual"
+    echo "------------------------------------------------------------------------------------------------------------"
+
+    echo -n "Do you still want to remove TCRP Friend, please answer [Yy/Nn]"
+    read answer
+
+    if [ "${answer}" = "Y" ] || [ "${answer}" = "y" ]; then
+
+        mount /dev/${loaderdisk}1 2>/dev/null
+        mount /dev/${loaderdisk}2 2>/dev/null
+        mount /dev/${loaderdisk}3 2>/dev/null
+
+        echo "Removing TCRP Friend from ${loaderdisk}3 "
+        [ -f /mnt/${loaderdisk}3/initrd-friend ] && sudo rm -rf /mnt/${loaderdisk}3/initrd-friend
+        [ -f /mnt/${loaderdisk}3/bzImage-friend ] && sudo rm -rf /mnt/${loaderdisk}3/bzImage-friend
+        echo "Removing initrd-dsm and zimage-dsm from ${loaderdisk}3 "
+        [ -f /mnt/${loaderdisk}3/initrd-dsm ] && sudo rm -rf /mnt/${loaderdisk}3/initrd-dsm
+        [ -f /mnt/${loaderdisk}3/zimage-dsm ] && sudo rm -rf /mnt/${loaderdisk}3/zimage-dsm
+        echo "Removing TCRP Friend Grub entry "
+        [ $(grep -i "Tiny Core Friend" /mnt/${loaderdisk}1/boot/grub/grub.cfg | wc -l) -eq 1 ] && sed -i "/Tiny Core Friend/,+9d" /mnt/${loaderdisk}1/boot/grub/grub.cfg
+
+        if [ "$MACHINE" = "VIRTUAL" ]; then
+            echo "Setting default boot entry to SATA"
+            cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"3\"/cset default=\"1\"" /mnt/${loaderdisk}1/boot/grub/grub.cfg
+        else
+            echo "Setting default boot entry to SATA"
+            cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"0\"/cset default=\"0\"" /mnt/${loaderdisk}1/boot/grub/grub.cfg
+        fi
+    else
+        echo "OK ! Wise choice !!! "
+    fi
+
+}
+
+bringfriend() {
+
+    clear
+    loaderdisk="$(mount | grep -i optional | grep cde | awk -F / '{print $3}' | uniq | cut -c 1-3)"
+
+    mount /dev/${loaderdisk}1 2>/dev/null
+    mount /dev/${loaderdisk}2 2>/dev/null
+    mount /dev/${loaderdisk}3 2>/dev/null
+
+    if [ -f /mnt/${loaderdisk}3/bzImage-friend ] && [ -f /mnt/${loaderdisk}3/initrd-friend ] && [ -f /mnt/${loaderdisk}3/zImage-dsm ] && [ -f /mnt/${loaderdisk}3/initrd-dsm ] && [ -f /mnt/${loaderdisk}3/user_config.json ] && [ $(grep -i "Tiny Core Friend" /mnt/${loaderdisk}1/boot/grub/grub.cfg | wc -l) -eq 1 ]; then
+        echo "Your TCRP friend seems in place, do you want to re-run the process ?"
+        read answer
+        if [ "${answer}" = "Y" ] || [ "${answer}" = "y" ]; then
+            echo "OK re-running the TCRP Friend bring over process"
+        else
+            echo "Wise choice"
+            exit 0
+        fi
+    fi
+
+    echo "You are upgrading your system with TCRP friend."
+    echo "Your system will still be able to boot using the USB/SATA options."
+    echo "After bringing over TCRP Friend, The default boot option will be set TCRP Friend."
+    echo "You will still have the option to move to SATA/USB but for automatic patching after an update,"
+    echo "please leave the default to TCRR Friend"
+
+    echo -n "If you agree with the above, please answer [Yy/Nn]"
+    read answer
+
+    if [ "${answer}" = "Y" ] || [ "${answer}" = "y" ]; then
+
+        if [ ! -f /mnt/${loaderdisk}3/initrd-friend ] || [ ! -f /mnt/${loaderdisk}3/bzImage-friend ]; then
+
+            [ ! -f /home/tc/friend/initrd-friend ] && [ ! -f /home/tc/friend/bzImage-friend ] && bringoverfriend
+
+            if [ -f /home/tc/friend/initrd-friend ] && [ -f /home/tc/friend/bzImage-friend ]; then
+
+                cp /home/tc/friend/initrd-friend /mnt/${loaderdisk}3/
+                cp /home/tc/friend/bzImage-friend /mnt/${loaderdisk}3/
+
+            fi
+
+        else
+
+            [ $(grep -i "Tiny Core Friend" /mnt/${loaderdisk}1/boot/grub/grub.cfg | wc -l) -eq 1 ] || tcrpfriendentry | sudo tee --append /mnt/${loaderdisk}1/boot/grub/grub.cfg
+
+            # Compining rd.gz and custom.gz
+
+            echo "Compining rd.gz and custom.gz and copying zimage to ${loaderdisk}3 "
+
+            [ ! -d /home/tc/rd.temp ] && mkdir /home/tc/rd.temp
+            [ -d /home/tc/rd.temp ] && cd /home/tc/rd.temp
+            if [ "$(od /mnt/${loaderdisk}1/rd.gz | head -1 | awk '{print $2}')" = "000135" ]; then
+                RD_COMPRESSED="true"
+            else
+                RD_COMPRESSED="false"
+            fi
+
+            if [ "$RD_COMPRESSED" = "false" ]; then
+                echo "Ramdisk in not compressed "
+                cat /mnt/${loaderdisk}1/rd.gz | sudo cpio -idm 2>/dev/null >/dev/null
+                cat /mnt/${loaderdisk}1/custom.gz | sudo cpio -idm 2>/dev/null >/dev/null
+                sudo chmod +x /home/tc/rd.temp/usr/sbin/modprobe
+                (cd /home/tc/rd.temp && sudo find . | sudo cpio -o -H newc -R root:root >/mnt/${loaderdisk}3/initrd-dsm) 2>&1 >/dev/null
+            else
+                unlzma -dc /mnt/${loaderdisk}1/rd.gz | sudo cpio -idm 2>/dev/null >/dev/null
+                cat /mnt/${loaderdisk}1/custom.gz | sudo cpio -idm 2>/dev/null >/dev/null
+                sudo chmod +x /home/tc/rd.temp/usr/sbin/modprobe
+                (cd /home/tc/rd.temp && sudo find . | sudo cpio -o -H newc -R root:root | xz -9 --format=lzma >/mnt/${loaderdisk}3/initrd-dsm) 2>&1 >/dev/null
+            fi
+
+            . /home/tc/rd.temp/etc/VERSION
+
+            MODEL="$(grep upnpmodelname /home/tc/rd.temp/etc/synoinfo.conf | awk -F= '{print $2}' | sed -e 's/"//g')"
+            VERSION="${productversion}-${buildnumber}"
+
+            cp -f /mnt/${loaderdisk}1/zImage /mnt/${loaderdisk}3/zImage-dsm
+
+            updateuserconfig
+
+            updateuserconfigfield "general" "model" "$MODEL"
+            updateuserconfigfield "general" "version" "${VERSION}"
+            zimghash=$(sha256sum /mnt/${loaderdisk}2/zImage | awk '{print $1}')
+            updateuserconfigfield "general" "zimghash" "$zimghash"
+            rdhash=$(sha256sum /mnt/${loaderdisk}2/rd.gz | awk '{print $1}')
+            updateuserconfigfield "general" "rdhash" "$rdhash"
+
+            USB_LINE="$(grep -A 5 "USB," /mnt/${loaderdisk}1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
+            SATA_LINE="$(grep -A 5 "SATA," /mnt/${loaderdisk}1/boot/grub/grub.cfg | grep linux | cut -c 16-999)"
+
+            echo "Updated user_config with USB Command Line : $USB_LINE"
+            json=$(jq --arg var "${USB_LINE}" '.general.usb_line = $var' $userconfigfile) && echo -E "${json}" | jq . >$userconfigfile
+            echo "Updated user_config with SATA Command Line : $SATA_LINE"
+            json=$(jq --arg var "${SATA_LINE}" '.general.sata_line = $var' $userconfigfile) && echo -E "${json}" | jq . >$userconfigfile
+
+            cp $userconfigfile /mnt/${loaderdisk}3/
+
+            echo "Setting default boot entry to TCRP Friend"
+            sudo sed -i "/set default=\"0\"/cset default=\"3\"" /mnt/${loaderdisk}1/boot/grub/grub.cfg
+
+            if [ ! -f /mnt/${loaderdisk}3/bzImage-friend ] || [ ! -f /mnt/${loaderdisk}3/initrd-friend ] || [ ! -f /mnt/${loaderdisk}3/zImage-dsm ] || [ ! -f /mnt/${loaderdisk}3/initrd-dsm ] || [ ! -f /mnt/${loaderdisk}3/user_config.json ] || [ ! $(grep -i "Tiny Core Friend" /mnt/${loaderdisk}1/boot/grub/grub.cfg | wc -l) -eq 1 ]; then
+                echo "ERROR !!! Something went wrong, please re-run the process"
+            fi
+            echo "Cleaning up temp files"
+            cd /home/tc
+            sudo rm -rf /home/tc/friend
+            sudo rm -rf /home/tc/rd.temp
+            echo "Unmounting file systems"
+            sudo umount /dev/${loaderdisk}1
+            sudo umount /dev/${loaderdisk}2
+
+        fi
+
+    else
+
+        echo "OK ! its your choice"
+        sudo umount /dev/${loaderdisk}1
+        sudo umount /dev/${loaderdisk}2
+    fi
+
 }
 
 function postupdate() {
@@ -2174,7 +2339,15 @@ mountshare, version, monitor, help
 - getgrubconf :
   Checks your user_config.json file variables against current grub.cfg variables and updates your
   user_config.json accordingly
-  
+
+- bringfriend
+  Downloads TCRP friend and makes it the default boot option. TCRP Friend is here to assist with
+  automated patching after an upgrade. No postupgrade actions will be required anymore, if TCRP
+  friend is left as the default boot option.
+
+- removefriend
+  Reverse bringfriend actions and remove TCRP from your loader 
+
 - help:           Show this page
 
 Version : $rploaderver
@@ -2440,10 +2613,6 @@ function buildloader() {
 
     updateuserconfigfield "general" "model" "$MODEL"
     updateuserconfigfield "general" "version" "${TARGET_VERSION}-${TARGET_REVISION}"
-    zimghash=$(sha256sum /home/tc/redpill-load/localdiskp2/zImage | awk '{print $1}')
-    updateuserconfigfield "general" "zimghash" "$zimghash"
-    rdhash=$(sha256sum /home/tc/redpill-load/localdiskp2/rd.gz | awk '{print $1}')
-    updateuserconfigfield "general" "rdhash" "$rdhash"
     zimghash=$(sha256sum /home/tc/redpill-load/localdiskp2/zImage | awk '{print $1}')
     updateuserconfigfield "general" "zimghash" "$zimghash"
     rdhash=$(sha256sum /home/tc/redpill-load/localdiskp2/rd.gz | awk '{print $1}')
@@ -3096,6 +3265,14 @@ if [ -z "$GATEWAY_INTERFACE" ]; then
         ;;
     getgrubconf)
         getgrubconf
+        exit 0
+        ;;
+    bringfriend)
+        bringfriend
+        exit 0
+        ;;
+    removefriend)
+        removefriend
         exit 0
         ;;
     *)
