@@ -663,13 +663,18 @@ removefriend() {
 bringfriend() {
 
     clear
-    getgrubconf
 
     loaderdisk="$(mount | grep -i optional | grep cde | awk -F / '{print $3}' | uniq | cut -c 1-3)"
 
     mount /dev/${loaderdisk}1 2>/dev/null
     mount /dev/${loaderdisk}2 2>/dev/null
     mount /dev/${loaderdisk}3 2>/dev/null
+
+    if [ -f /mnt/${loaderdisk}3/lastsession/user_config.json ]; then
+        cp /mnt/${loaderdisk}3/lastsession/user_config.json /home/tc/user_config.json
+    else
+        getgrubconf
+    fi
 
     if [ -f /mnt/${loaderdisk}3/bzImage-friend ] && [ -f /mnt/${loaderdisk}3/initrd-friend ] && [ -f /mnt/${loaderdisk}3/zImage-dsm ] && [ -f /mnt/${loaderdisk}3/initrd-dsm ] && [ -f /mnt/${loaderdisk}3/user_config.json ] && [ $(grep -i "Tiny Core Friend" /mnt/${loaderdisk}1/boot/grub/grub.cfg | wc -l) -eq 1 ]; then
         echo "Your TCRP friend seems in place, do you want to re-run the process ?"
