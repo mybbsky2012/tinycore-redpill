@@ -672,6 +672,7 @@ bringfriend() {
 
     if [ -f /mnt/${loaderdisk}3/lastsession/user_config.json ]; then
         cp /mnt/${loaderdisk}3/lastsession/user_config.json /home/tc/user_config.json
+        getgrubconf
     else
         getgrubconf
     fi
