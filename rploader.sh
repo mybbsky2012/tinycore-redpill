@@ -663,6 +663,8 @@ removefriend() {
 bringfriend() {
 
     clear
+    getgrubconf
+
     loaderdisk="$(mount | grep -i optional | grep cde | awk -F / '{print $3}' | uniq | cut -c 1-3)"
 
     mount /dev/${loaderdisk}1 2>/dev/null
