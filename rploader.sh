@@ -642,7 +642,9 @@ removefriend() {
         [ -f /mnt/${loaderdisk}3/initrd-friend ] && sudo rm -rf /mnt/${loaderdisk}3/initrd-friend
         [ -f /mnt/${loaderdisk}3/bzImage-friend ] && sudo rm -rf /mnt/${loaderdisk}3/bzImage-friend
         echo "Removing initrd-dsm and zimage-dsm from ${loaderdisk}3 "
+        [ ! "$(sha256sum /mnt/${loaderdisk}3/initrd-dsm | awk '{print $2}')" = "$(sha256sum /mnt/${loaderdisk}1/rd.gz | awk '{print $2}')" ] && cp /mnt/${loaderdisk}3/initrd-dsm /mnt/${loaderdisk}1/rd.gz
         [ -f /mnt/${loaderdisk}3/initrd-dsm ] && sudo rm -rf /mnt/${loaderdisk}3/initrd-dsm
+        [ ! "$(sha256sum /mnt/${loaderdisk}3/zImage-dsm | awk '{print $2}')" = "$(sha256sum /mnt/${loaderdisk}1/zImage | awk '{print $2}')" ] && cp /mnt/${loaderdisk}3/zImage-dsm /mnt/${loaderdisk}1/zImage
         [ -f /mnt/${loaderdisk}3/zimage-dsm ] && sudo rm -rf /mnt/${loaderdisk}3/zimage-dsm
         echo "Removing TCRP Friend Grub entry "
         [ $(grep -i "Tiny Core Friend" /mnt/${loaderdisk}1/boot/grub/grub.cfg | wc -l) -eq 1 ] && sed -i "/Tiny Core Friend/,+9d" /mnt/${loaderdisk}1/boot/grub/grub.cfg
