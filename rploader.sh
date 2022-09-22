@@ -649,10 +649,10 @@ removefriend() {
 
         if [ "$MACHINE" = "VIRTUAL" ]; then
             echo "Setting default boot entry to SATA"
-            cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"3\"/cset default=\"1\"" /mnt/${loaderdisk}1/boot/grub/grub.cfg
+            cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"*\"/cset default=\"1\"" /mnt/${loaderdisk}1/boot/grub/grub.cfg
         else
-            echo "Setting default boot entry to SATA"
-            cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"0\"/cset default=\"0\"" /mnt/${loaderdisk}1/boot/grub/grub.cfg
+            echo "Setting default boot entry to USB"
+            cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"*\"/cset default=\"0\"" /mnt/${loaderdisk}1/boot/grub/grub.cfg
         fi
     else
         echo "OK ! Wise choice !!! "
@@ -758,7 +758,7 @@ bringfriend() {
             cp $userconfigfile /mnt/${loaderdisk}3/
 
             echo "Setting default boot entry to TCRP Friend"
-            sudo sed -i "/set default=\"0\"/cset default=\"3\"" /mnt/${loaderdisk}1/boot/grub/grub.cfg
+            sudo sed -i "/set default=\"*\"/cset default=\"3\"" /mnt/${loaderdisk}1/boot/grub/grub.cfg
 
             if [ ! -f /mnt/${loaderdisk}3/bzImage-friend ] || [ ! -f /mnt/${loaderdisk}3/initrd-friend ] || [ ! -f /mnt/${loaderdisk}3/zImage-dsm ] || [ ! -f /mnt/${loaderdisk}3/initrd-dsm ] || [ ! -f /mnt/${loaderdisk}3/user_config.json ] || [ ! $(grep -i "Tiny Core Friend" /mnt/${loaderdisk}1/boot/grub/grub.cfg | wc -l) -eq 1 ]; then
                 echo "ERROR !!! Something went wrong, please re-run the process"
@@ -2652,13 +2652,13 @@ function buildloader() {
         fi
 
         echo "Setting default boot entry to TCRP Friend"
-        cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"0\"/cset default=\"3\"" localdiskp1/boot/grub/grub.cfg
+        cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"*\"/cset default=\"3\"" localdiskp1/boot/grub/grub.cfg
 
     else
 
         if [ "$MACHINE" = "VIRTUAL" ]; then
             echo "Setting default boot entry to SATA"
-            cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"0\"/cset default=\"1\"" localdiskp1/boot/grub/grub.cfg
+            cd /home/tc/redpill-load/ && sudo sed -i "/set default=\"*\"/cset default=\"1\"" localdiskp1/boot/grub/grub.cfg
         fi
 
     fi
