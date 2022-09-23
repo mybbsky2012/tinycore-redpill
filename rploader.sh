@@ -2,12 +2,12 @@
 #
 # Author :
 # Date : 220914
-# Version : 0.9.2.2
+# Version : 0.9.2.3
 #
 #
 # User Variables :
 
-rploaderver="0.9.2.2"
+rploaderver="0.9.2.3"
 build="develop"
 rploaderfile="https://raw.githubusercontent.com/pocopico/tinycore-redpill/$build/rploader.sh"
 rploaderrepo="https://github.com/pocopico/tinycore-redpill/raw/$build/"
@@ -77,6 +77,7 @@ function history() {
     0.9.2.0 Introducing TCRP Friend
     0.9.2.1 If TCRP Friend is used then default option will be TCRP Friend
     0.9.2.2 Upgrade your system by adding TCRP Friend with command bringfriend
+    0.9.2.3 Adding experimental DS2422+ support
     --------------------------------------------------------------------------------------
 EOF
 
@@ -227,7 +228,7 @@ function syntaxcheck() {
 
         serialgen)
             echo "Syntax error, You have to specify one of the existing models"
-            echo "DS3615xs DS3617xs DS916+ DS918+ DS920+ DS3622xs+ FS6400 DVA3219 DVA3221 DS1621+ DVA1622"
+            echo "DS3615xs DS3617xs DS916+ DS918+ DS920+ DS3622xs+ FS6400 DVA3219 DVA3221 DS1621+ DVA1622 DS2422+"
             ;;
 
         patchdtc)
@@ -419,6 +420,8 @@ function processpat() {
         SYNOMODEL="ds920p_$TARGET_REVISION" && MODEL="DS920+"
     elif [ "${TARGET_PLATFORM}" = "dva1622" ]; then
         SYNOMODEL="dva1622_$TARGET_REVISION" && MODEL="DVA1622"
+    elif [ "${TARGET_PLATFORM}" = "ds2422p" ]; then
+        SYNOMODEL="ds2422p_$TARGET_REVISION" && MODEL="DS2422+"
     fi
 
     if [ ! -d "${temp_pat_folder}" ]; then
@@ -569,7 +572,7 @@ function addrequiredexts() {
         cd /home/tc/redpill-load/ && ./ext-manager.sh _update_platform_exts ${SYNOMODEL} ${extension}
     done
 
-    if [ ${TARGET_PLATFORM} = "geminilake" ] || [ ${TARGET_PLATFORM} = "v1000" ] || [ ${TARGET_PLATFORM} = "dva1622" ]; then
+    if [ ${TARGET_PLATFORM} = "geminilake" ] || [ ${TARGET_PLATFORM} = "v1000" ] || [ ${TARGET_PLATFORM} = "dva1622" ] || [ ${TARGET_PLATFORM} = "ds2422p" ]; then
         #patchdtc
         echo "Patch dtc is superseded by fbelavenuto dtbpatch"
     fi
@@ -1415,6 +1418,7 @@ function patchdtc() {
         dtbfile="ds920p"
     elif [ "${TARGET_PLATFORM}" = "dva1622" ]; then
         dtbfile="dva1622"
+
     else
         echo "${TARGET_PLATFORM} does not require model.dtc patching "
         return
@@ -1875,7 +1879,7 @@ function serialgen() {
 
     [ "$2" == "realmac" ] && let keepmac=1 || let keepmac=0
 
-    if [ "$1" = "DS3615xs" ] || [ "$1" = "DS3617xs" ] || [ "$1" = "DS916+" ] || [ "$1" = "DS918+" ] || [ "$1" = "DS920+" ] || [ "$1" = "DS3622xs+" ] || [ "$1" = "FS6400" ] || [ "$1" = "DVA3219" ] || [ "$1" = "DVA3221" ] || [ "$1" = "DS1621+" ] || [ "$1" = "DVA1622" ]; then
+    if [ "$1" = "DS3615xs" ] || [ "$1" = "DS3617xs" ] || [ "$1" = "DS916+" ] || [ "$1" = "DS918+" ] || [ "$1" = "DS920+" ] || [ "$1" = "DS3622xs+" ] || [ "$1" = "FS6400" ] || [ "$1" = "DVA3219" ] || [ "$1" = "DVA3221" ] || [ "$1" = "DS1621+" ] || [ "$1" = "DVA1622" ] || [ "$1" = "DS2422+" ]; then
         serial="$(generateSerial $1)"
         mac="$(generateMacAddress $1)"
         realmac=$(ifconfig eth0 | head -1 | awk '{print $NF}')
@@ -1909,7 +1913,7 @@ function serialgen() {
         fi
     else
         echo "Error : $1 is not an available model for serial number generation. "
-        echo "Available Models : DS3615xs DS3617xs DS916+ DS918+ DS920+ DS3622xs+ FS6400 DVA3219 DVA3221 DS1621+ DVA1622"
+        echo "Available Models : DS3615xs DS3617xs DS916+ DS918+ DS920+ DS3622xs+ FS6400 DVA3219 DVA3221 DS1621+ DVA1622 DS2422+"
     fi
 
 }
@@ -1960,6 +1964,10 @@ function beginArray() {
     DVA1622)
         permanent="SJR"
         serialstart="2030 2040 20C0 2150"
+        ;;
+    DS2422+)
+        permanent="S7R"
+        serialstart="2080"
         ;;
     esac
 
@@ -2034,6 +2042,9 @@ function generateSerial() {
         serialnum=$(toupper "$(echo "$serialstart" | tr ' ' '\n' | sort -R | tail -1)$permanent"$(generateRandomLetter)$(generateRandomValue)$(generateRandomValue)$(generateRandomValue)$(generateRandomValue)$(generateRandomLetter))
         ;;
     DVA1622)
+        serialnum=$(toupper "$(echo "$serialstart" | tr ' ' '\n' | sort -R | tail -1)$permanent"$(generateRandomLetter)$(generateRandomValue)$(generateRandomValue)$(generateRandomValue)$(generateRandomValue)$(generateRandomLetter))
+        ;;
+    DS2422+)
         serialnum=$(toupper "$(echo "$serialstart" | tr ' ' '\n' | sort -R | tail -1)$permanent"$(generateRandomLetter)$(generateRandomValue)$(generateRandomValue)$(generateRandomValue)$(generateRandomValue)$(generateRandomLetter))
         ;;
     esac
@@ -2302,7 +2313,7 @@ mountshare, version, monitor, help
   
 - serialgen <synomodel> <option> :
   Generates a serial number and mac address for the following platforms 
-  DS3615xs DS3617xs DS916+ DS918+ DS920+ DS3622xs+ FS6400 DVA3219 DVA3221 DS1621+ DVA1622
+  DS3615xs DS3617xs DS916+ DS918+ DS920+ DS3622xs+ FS6400 DVA3219 DVA3221 DS1621+ DVA1622 DS2422+
   
   Valid Options :  realmac , keeps the real mac of interface eth0
   
@@ -2446,6 +2457,8 @@ function getstaticmodule() {
         SYNOMODEL="ds920p_$TARGET_REVISION"
     elif [ "${TARGET_PLATFORM}" = "dva1622" ]; then
         SYNOMODEL="dva1622_$TARGET_REVISION"
+    elif [ "${TARGET_PLATFORM}" = "ds2422p" ]; then
+        SYNOMODEL="ds2422p_$TARGET_REVISION" && MODEL="DS2422+"
     fi
 
     echo "Looking for redpill for : $SYNOMODEL "
@@ -2866,7 +2879,7 @@ function getvars() {
         KERNEL_MAJOR="3"
         MODULE_ALIAS_FILE="modules.alias.3.json"
         ;;
-    apollolake | broadwell | broadwellnk | v1000 | denverton | geminilake | dva1622)
+    apollolake | broadwell | broadwellnk | v1000 | denverton | geminilake | dva1622 | ds2422p)
         KERNEL_MAJOR="4"
         MODULE_ALIAS_FILE="modules.alias.4.json"
         ;;
@@ -2888,6 +2901,8 @@ function getvars() {
         SYNOMODEL="ds920p_$TARGET_REVISION" && MODEL="DS920+"
     elif [ "${TARGET_PLATFORM}" = "dva1622" ]; then
         SYNOMODEL="dva1622_$TARGET_REVISION" && MODEL="DVA1622"
+    elif [ "${TARGET_PLATFORM}" = "ds2422p" ]; then
+        SYNOMODEL="ds2422p_$TARGET_REVISION" && MODEL="DS2422+"
     fi
 
     #echo "Platform : $platform_selected"
