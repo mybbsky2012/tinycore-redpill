@@ -2850,7 +2850,9 @@ function getvars() {
     tcrppart="$(mount | grep -i optional | grep cde | awk -F / '{print $3}' | uniq | cut -c 1-3)3"
     local_cache="/mnt/${tcrppart}/auxfiles"
 
-    [ ! -h /lib64 ] && ln -s /lib /lib64
+    [ ! -h /lib64 ] && sudo ln -s /lib /lib64
+
+    sudo chown -R tc:staff /home/tc
 
     if [ ! -n "$(which bspatch)" ]; then
 
